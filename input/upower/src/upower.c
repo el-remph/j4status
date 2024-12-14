@@ -37,6 +37,7 @@ struct _J4statusPluginContext {
     J4statusFormatString *format;
     UpClient *up_client;
     gboolean started;
+    guint8 threshold_bad, threshold_urgent;
 };
 
 typedef struct {
@@ -130,12 +131,12 @@ _j4status_upower_device_changed(GObject *device, GParamSpec *pspec, gpointer use
     case UP_DEVICE_STATE_DISCHARGING:
     case UP_DEVICE_STATE_PENDING_DISCHARGE:
         data.status = STATE_DISCHARGING;
-        if ( data.percentage < 15 )
+        if ( data.percentage < section->context->threshold_bad )
             state = J4STATUS_STATE_BAD;
         else
             state = J4STATUS_STATE_AVERAGE;
 
-        if ( data.percentage < 5 )
+        if ( data.percentage < section->context->threshold_urgent )
             state |= J4STATUS_STATE_URGENT;
 
         g_object_get(device, "time-to-empty", &data.time, NULL);
@@ -247,6 +248,24 @@ _j4status_upower_section_new(J4statusPluginContext *context, GObject *device, gb
 
 static void _j4status_upower_uninit(J4statusPluginContext *context);
 
+static void
+get_threshold(GKeyFile *key_file, const gchar *key, guint8 *target)
+{
+    GError * e = NULL;
+    gint threshold = g_key_file_get_integer(key_file, "UPower", key, &e);
+
+    if (e)
+    {
+        if ( e->code != G_KEY_FILE_ERROR_KEY_NOT_FOUND )
+            g_warning("UPower.%s: %s", key, e->message);
+        g_free(e);
+    }
+    else if ( threshold < 0 || threshold > 100 )
+        g_warning("UPower.%s=%d: %s", key, threshold, g_strerror(ERANGE));
+    else
+        *target = threshold;
+}
+
 static J4statusPluginContext *
 _j4status_upower_init(J4statusCoreInterface *core)
 {
@@ -255,6 +274,8 @@ _j4status_upower_init(J4statusCoreInterface *core)
     context->core = core;
 
     context->up_client = up_client_new();
+    context->threshold_bad = 15;
+    context->threshold_urgent = 5;
 
     gboolean all_devices = FALSE;
     gchar *format = NULL;
@@ -265,7 +286,16 @@ _j4status_upower_init(J4statusCoreInterface *core)
     {
         all_devices = g_key_file_get_boolean(key_file, "UPower", "AllDevices", NULL);
         format = g_key_file_get_string(key_file, "UPower", "Format", NULL);
+        get_threshold(key_file, "BadThreshold", &context->threshold_bad);
+        get_threshold(key_file, "UrgentThreshold", &context->threshold_urgent);
         g_key_file_free(key_file);
+        if ( context->threshold_bad < context->threshold_urgent )
+        {
+            g_warning("BadThreshold < UrgentThreshold (%hhu < %hhu); resetting to defaults",
+                      context->threshold_bad, context->threshold_urgent);
+            context->threshold_bad = 15;
+            context->threshold_urgent = 5;
+        }
     }
     context->format = j4status_format_string_parse(format, _j4status_upower_format_tokens, G_N_ELEMENTS(_j4status_upower_format_tokens), J4STATUS_UPOWER_DEFAULT_FORMAT, NULL);
 

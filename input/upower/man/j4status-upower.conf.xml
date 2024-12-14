@@ -121,6 +121,26 @@
                         </para>
                     </listitem>
                 </varlistentry>
+
+                <varlistentry>
+                    <term>
+                        <varname>BadThreshold=</varname>
+                        (<type>integer</type>, defaults to <literal>15</literal>)
+                    </term>
+                    <listitem>
+                        <para>Percentage below which battery level is red</para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>
+                        <varname>UrgentThreshold=</varname>
+                        (<type>integer</type>, defaults to <literal>5</literal>)
+                    </term>
+                    <listitem>
+                        <para>Percentage below which battery level is very red</para>
+                    </listitem>
+                </varlistentry>
             </variablelist>
         </refsect2>
     </refsect1>
