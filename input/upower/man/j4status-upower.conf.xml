@@ -124,6 +124,16 @@
 
                 <varlistentry>
                     <term>
+                        <varname>WarningThreshold=</varname>
+                        (<type>integer</type>, defaults to <literal>25</literal>)
+                    </term>
+                    <listitem>
+                        <para>Percentage below which battery level is yellow</para>
+                    </listitem>
+                </varlistentry>
+
+                <varlistentry>
+                    <term>
                         <varname>BadThreshold=</varname>
                         (<type>integer</type>, defaults to <literal>15</literal>)
                     </term>

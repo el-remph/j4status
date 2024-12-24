@@ -37,7 +37,7 @@ struct _J4statusPluginContext {
     J4statusFormatString *format;
     UpClient *up_client;
     gboolean started;
-    guint8 threshold_bad, threshold_urgent;
+    guint8 threshold_warn, threshold_bad, threshold_urgent;
 };
 
 typedef struct {
@@ -124,7 +124,7 @@ _j4status_upower_device_changed(GObject *device, GParamSpec *pspec, gpointer use
     case UP_DEVICE_STATE_CHARGING:
     case UP_DEVICE_STATE_PENDING_CHARGE:
         data.status = STATE_CHARGING;
-        state = J4STATUS_STATE_AVERAGE;
+        state = J4STATUS_STATE_NO_STATE;
 
         g_object_get(device, "time-to-full", &data.time, NULL);
     break;
@@ -133,8 +133,10 @@ _j4status_upower_device_changed(GObject *device, GParamSpec *pspec, gpointer use
         data.status = STATE_DISCHARGING;
         if ( data.percentage < section->context->threshold_bad )
             state = J4STATUS_STATE_BAD;
-        else
+        else if ( data.percentage < section->context->threshold_warn )
             state = J4STATUS_STATE_AVERAGE;
+        else
+            state = J4STATUS_STATE_NO_STATE;
 
         if ( data.percentage < section->context->threshold_urgent )
             state |= J4STATUS_STATE_URGENT;
@@ -274,6 +276,7 @@ _j4status_upower_init(J4statusCoreInterface *core)
     context->core = core;
 
     context->up_client = up_client_new();
+    context->threshold_warn = 25;
     context->threshold_bad = 15;
     context->threshold_urgent = 5;
 
@@ -286,13 +289,15 @@ _j4status_upower_init(J4statusCoreInterface *core)
     {
         all_devices = g_key_file_get_boolean(key_file, "UPower", "AllDevices", NULL);
         format = g_key_file_get_string(key_file, "UPower", "Format", NULL);
+        get_threshold(key_file, "WarningThreshold", &context->threshold_warn);
         get_threshold(key_file, "BadThreshold", &context->threshold_bad);
         get_threshold(key_file, "UrgentThreshold", &context->threshold_urgent);
         g_key_file_free(key_file);
-        if ( context->threshold_bad < context->threshold_urgent )
+        if ( ! (context->threshold_warn > context->threshold_bad && context->threshold_bad > context->threshold_urgent) )
         {
-            g_warning("BadThreshold < UrgentThreshold (%hhu < %hhu); resetting to defaults",
-                      context->threshold_bad, context->threshold_urgent);
+            g_warning("WarningThreshold, BadThreshold and UrgentThreshold not in descending order (%hhu, %hhu, %hhu); resetting to defaults",
+                      context->threshold_warn, context->threshold_bad, context->threshold_urgent);
+            context->threshold_warn = 25;
             context->threshold_bad = 15;
             context->threshold_urgent = 5;
         }
